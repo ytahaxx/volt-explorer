@@ -1,7 +1,9 @@
+
 """Point d'entrée de Volt Explorer (fabrique d'application Flask).
 
-Lancer en local :  python app.py   →  http://127.0.0.1:5000
+Lancer en local : python app.py → http://127.0.0.1:5000
 """
+
 import os
 import sys
 from pathlib import Path
@@ -21,38 +23,55 @@ from services.rag_service import RagService  # noqa: E402
 def create_app(config_object=Config, overrides=None):
     app = Flask(__name__)
     app.config.from_object(config_object)
+
     if overrides:
         app.config.update(overrides)
 
-    # Base de données : créée et alimentée depuis data/propositions.json au premier lancement.
+    # Initialisation de la base de données
     if not Path(app.config["DATABASE"]).exists():
-        init_db(app.config["DATABASE"], app.config["PROPOSITIONS_JSON"])
+        init_db(
+            app.config["DATABASE"],
+            app.config["PROPOSITIONS_JSON"]
+        )
+
     app.teardown_appcontext(close_db)
 
-    # Services (chargés une fois au démarrage)
+    # Chargement des propositions
     conn = connect(app.config["DATABASE"])
     try:
         propositions = models.list_all_propositions(conn)
     finally:
         conn.close()
-    app.extensions["quiz_service"] = QuizService(app.config["QUIZ_JSON"])
-    app.extensions["rag_service"] = RagService(propositions, app.config)
 
+    # Initialisation des services
+    app.extensions["quiz_service"] = QuizService(
+        app.config["QUIZ_JSON"]
+    )
+
+    app.extensions["rag_service"] = RagService(
+        propositions,
+        app.config
+    )
+
+    # Enregistrement des Blueprints
     for module in (main, programme, search, quiz, assistant):
         app.register_blueprint(module.bp)
 
+    # Gestion des erreurs 404
     @app.errorhandler(404)
     def not_found(_e):
         if request.path.startswith("/api/"):
             return jsonify(error="Ressource introuvable."), 404
         return render_template("404.html"), 404
 
+    # Gestion des erreurs 405
     @app.errorhandler(405)
     def method_not_allowed(_e):
         if request.path.startswith("/api/"):
             return jsonify(error="Méthode non autorisée."), 405
         return render_template("404.html"), 405
 
+    # Gestion des erreurs 500
     @app.errorhandler(500)
     def server_error(_e):
         if request.path.startswith("/api/"):
@@ -62,6 +81,20 @@ def create_app(config_object=Config, overrides=None):
     return app
 
 
+# ==========================================
+# INSTANCE FLASK PRINCIPALE POUR VERCEL
+# ==========================================
+
+app = create_app()
+
+
+# ==========================================
+# LANCEMENT LOCAL
+# ==========================================
+
 if __name__ == "__main__":
-    create_app().run(host="127.0.0.1", port=int(os.getenv("PORT", "5000")),
-                     debug=os.getenv("FLASK_DEBUG", "0") == "1")
+    app.run(
+        host="127.0.0.1",
+        port=int(os.getenv("PORT", "5000")),
+        debug=os.getenv("FLASK_DEBUG", "0") == "1"
+    )
