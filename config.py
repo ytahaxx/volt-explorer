@@ -17,7 +17,14 @@ class Config:
     JSON_AS_ASCII = False
 
     DATA_DIR = BASE_DIR / "data"
-    DATABASE = os.getenv("DATABASE_PATH", str(BASE_DIR / "database" / "volt_explorer.sqlite3"))
+   # Sur Vercel, utiliser le dossier temporaire accessible en écriture.
+if os.getenv("VERCEL"):
+    DATABASE = "/tmp/volt_explorer.sqlite3"
+else:
+    DATABASE = os.getenv(
+        "DATABASE_PATH",
+        str(BASE_DIR / "database" / "volt_explorer.sqlite3")
+    )
     PROPOSITIONS_JSON = str(DATA_DIR / "propositions.json")
     QUIZ_JSON = str(DATA_DIR / "quiz.json")
     PROGRAMME_PDF = str(DATA_DIR / "programme.pdf")  # optionnel : voir README
