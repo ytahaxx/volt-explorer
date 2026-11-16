@@ -1,40 +1,37 @@
-"""Point d'entrée de Volt Explorer (fabrique d'application Flask).
-
-Lancer en local :  python app.py   →  http://127.0.0.1:5000
-"""
 import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from flask import Flask, jsonify, render_template, request  # noqa: E402
+from flask import Flask, jsonify, render_template, request
 
-from config import Config  # noqa: E402
-from database import models  # noqa: E402
-from database.db import close_db, connect, init_db  # noqa: E402
-from routes import assistant, main, programme, quiz, search  # noqa: E402
-from services.quiz_service import QuizService  # noqa: E402
-from services.rag_service import RagService  # noqa: E402
+from config import Config
+from database import models
+from database.db import close_db, connect, init_db
+from routes import assistant, main, programme, quiz, search
+from services.quiz_service import QuizService
+from services.rag_service import RagService
 
 
 def create_app(config_object=Config, overrides=None):
     app = Flask(__name__)
     app.config.from_object(config_object)
+
     if overrides:
         app.config.update(overrides)
 
-    # Base de données : créée et alimentée depuis data/propositions.json au premier lancement.
     if not Path(app.config["DATABASE"]).exists():
         init_db(app.config["DATABASE"], app.config["PROPOSITIONS_JSON"])
+
     app.teardown_appcontext(close_db)
 
-    # Services (chargés une fois au démarrage)
     conn = connect(app.config["DATABASE"])
     try:
         propositions = models.list_all_propositions(conn)
     finally:
         conn.close()
+
     app.extensions["quiz_service"] = QuizService(app.config["QUIZ_JSON"])
     app.extensions["rag_service"] = RagService(propositions, app.config)
 
@@ -62,6 +59,13 @@ def create_app(config_object=Config, overrides=None):
     return app
 
 
+# Instance Flask principale
+app = create_app()
+
+
 if __name__ == "__main__":
-    create_app().run(host="127.0.0.1", port=int(os.getenv("PORT", "5000")),
-                     debug=os.getenv("FLASK_DEBUG", "0") == "1")
+    app.run(
+        host="127.0.0.1",
+        port=int(os.getenv("PORT", "5000")),
+        debug=os.getenv("FLASK_DEBUG", "0") == "1"
+    )
