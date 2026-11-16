@@ -59,10 +59,10 @@ def create_app(config_object=Config, overrides=None):
     return app
 
 
-# Instance Flask principale
+# Instance principale pour Vercel
 app = create_app()
 
-
+# Lancement local
 if __name__ == "__main__":
     app.run(
         host="127.0.0.1",
